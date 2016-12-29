@@ -13,6 +13,15 @@ R3::R3(r3::node* tree) : tree_(tree) {
 R3::~R3() {
 }
 
+r3::match_entry *entry;
+r3::route *matched_route;
+R3* tree;
+v8::Local<v8::Array> tokens;
+v8::Local<v8::Object> matchRet;
+v8::Isolate* isolate;
+const char* path;
+v8::Local<v8::String::Utf8Value> str;
+
 void *ptr_from_value_persistent(const v8::Local<v8::Value> &value) {
     Nan::Persistent<v8::Value> *data = new Nan::Persistent<v8::Value>(value);
     return data;
@@ -48,7 +57,7 @@ void R3::New(const Nan::FunctionCallbackInfo<v8::Value>& info) {
 }
 
 void R3::Insert(const Nan::FunctionCallbackInfo<v8::Value>& info) {
-  R3* tree = ObjectWrap::Unwrap<R3>(info.Holder());
+  tree = ObjectWrap::Unwrap<R3>(info.Holder());
   v8::String::Utf8Value str(info[0]);
 
   const char* path = ToCString(str);
@@ -65,10 +74,11 @@ void R3::Insert(const Nan::FunctionCallbackInfo<v8::Value>& info) {
 }
 
 void R3::Compile(const Nan::FunctionCallbackInfo<v8::Value>& info) {
-  R3* tree = ObjectWrap::Unwrap<R3>(info.Holder());
+  tree = ObjectWrap::Unwrap<R3>(info.Holder());
 
   char *errstr = NULL;
   int err = r3::r3_tree_compile(tree->tree_, &errstr);
+
   if (err) {
     Nan::ThrowError(errstr);
     delete errstr;
@@ -76,30 +86,32 @@ void R3::Compile(const Nan::FunctionCallbackInfo<v8::Value>& info) {
 }
 
 void R3::Match(const Nan::FunctionCallbackInfo<v8::Value>& info) {
-  R3* tree = ObjectWrap::Unwrap<R3>(info.Holder());
-  v8::Isolate* isolate = info.GetIsolate();
+  tree = ObjectWrap::Unwrap<R3>(info.Holder());
+  isolate = info.GetIsolate();
 
-  v8::String::Utf8Value str(info[0]);
-  const char* path = ToCString(str);
+  entry = r3::match_entry_create("/exobot/test");
+  matched_route = r3::r3_tree_match_route(tree->tree_, entry);
+  v8::String::Utf8Value str(info[0]); // super slow
+  path = ToCString(str);
 
-  r3::match_entry *entry = r3::match_entry_create(path);
-  r3::route *matched_route = r3::r3_tree_match_route(tree->tree_, entry);
-
+  /*
   if (matched_route) {
-    v8::Local<v8::Object> obj = v8::Object::New(isolate);
-    v8::Local<v8::Array> tokens = v8::Array::New(isolate);
+    matchRet = v8::Object::New(isolate);
+    tokens = v8::Array::New(isolate);
 
     for (int i = 0; i < entry->vars->len ; i++) {
       tokens->Set(i, v8::String::NewFromUtf8(isolate, entry->vars->tokens[i]));
     }
 
-    obj->Set(v8::String::NewFromUtf8(isolate, "params"), tokens);
+    matchRet->Set(v8::String::NewFromUtf8(isolate, "params"), tokens);
 
     v8::Local<v8::Value> fn = Nan::New(*reinterpret_cast<Nan::Persistent<v8::Value> *>(matched_route->data));
-    obj->Set(v8::String::NewFromUtf8(isolate, "fn"), fn);
-
-    info.GetReturnValue().Set(obj);
+    matchRet->Set(v8::String::NewFromUtf8(isolate, "fn"), fn);
+    info.GetReturnValue().Set(matchRet);
   } else {
     info.GetReturnValue().Set(Nan::Null());
   }
+  */
+
+  info.GetReturnValue().Set(Nan::Null());
 }
