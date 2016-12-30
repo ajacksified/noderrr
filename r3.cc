@@ -13,18 +13,27 @@ R3::R3(r3::node* tree) : tree_(tree) {
 R3::~R3() {
 }
 
-r3::match_entry *entry;
-r3::route *matched_route;
 R3* tree;
 v8::Local<v8::Array> tokens;
 v8::Local<v8::Object> matchRet;
 v8::Isolate* isolate;
 const char* path;
 v8::Local<v8::String::Utf8Value> str;
+v8::Local<v8::Function> fn;
+
+struct Work {
+  uv_work_t  request;
+  Nan::Callback* callback;
+
+  R3* tree;
+  const char* path;
+  r3::match_entry * entry;
+  r3::route route;
+};
 
 void *ptr_from_value_persistent(const v8::Local<v8::Value> &value) {
-    Nan::Persistent<v8::Value> *data = new Nan::Persistent<v8::Value>(value);
-    return data;
+  Nan::Persistent<v8::Value> *data = new Nan::Persistent<v8::Value>(value);
+  return data;
 }
 
 const char* ToCString(const v8::String::Utf8Value& value) {
@@ -85,14 +94,11 @@ void R3::Compile(const Nan::FunctionCallbackInfo<v8::Value>& info) {
   }
 }
 
-void R3::Match(const Nan::FunctionCallbackInfo<v8::Value>& info) {
-  tree = ObjectWrap::Unwrap<R3>(info.Holder());
-  isolate = info.GetIsolate();
-
-  entry = r3::match_entry_create("/exobot/test");
-  matched_route = r3::r3_tree_match_route(tree->tree_, entry);
-  v8::String::Utf8Value str(info[0]); // super slow
-  path = ToCString(str);
+// called by libuv worker in separate thread
+static void WorkAsync(uv_work_t *req) {
+  Work *work = static_cast<Work *>(req->data);
+  //work->entry = r3::match_entry_create(work->path);
+  //work->route = r3::r3_tree_match_route(work->tree, work->entry);
 
   /*
   if (matched_route) {
@@ -112,6 +118,46 @@ void R3::Match(const Nan::FunctionCallbackInfo<v8::Value>& info) {
     info.GetReturnValue().Set(Nan::Null());
   }
   */
+}
 
-  info.GetReturnValue().Set(Nan::Null());
+// called by libuv in event loop when async function completes
+static void WorkAsyncComplete(uv_work_t *req, int status) {
+  isolate = v8::Isolate::GetCurrent();
+  v8::HandleScope handleScope(isolate);
+
+  Work *work = static_cast<Work *>(req->data);
+  v8::Handle<v8::Value> argv[] = { };
+
+  // execute the callback
+  v8::Local<v8::Function>::New(isolate, work->callback->GetFunction())->
+    Call(isolate->GetCurrentContext()->Global(), 1, argv);
+
+  // Free up the persistent function callback
+  work->callback->Reset();
+
+  delete work;
+}
+
+void R3::Match(const Nan::FunctionCallbackInfo<v8::Value>& info) {
+  tree = ObjectWrap::Unwrap<R3>(info.Holder());
+  isolate = info.GetIsolate();
+  v8::HandleScope handleScope(isolate);
+
+  v8::String::Utf8Value str(info[0]); // super slow
+  path = ToCString(str);
+
+  fn = v8::Local<v8::Function>::Cast(info[1]);
+  Nan::Callback callback(fn);
+
+  Work * work = new Work();
+  work->request.data = work;
+  work->tree = tree;
+  work->path = path;
+
+  work->callback = &callback;
+  //work->callback->Reset(isolate, callback);
+
+  uv_queue_work(uv_default_loop(), &work->request, WorkAsync, WorkAsyncComplete);
+
+  info.GetReturnValue().Set(Undefined(isolate));
 }
