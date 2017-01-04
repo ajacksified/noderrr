@@ -18,10 +18,9 @@ R3* tree;
 v8::Local<v8::Array> tokens;
 v8::Local<v8::Object> matchRet;
 v8::Isolate* isolate;
-const char* path;
+char* path;
 v8::Local<v8::String::Utf8Value> str;
-
-r3::match_entry *entry = r3::match_entry_create("/");
+r3::match_entry *entry = r3::match_entry_createl("/", 1);
 
 void *ptr_from_value_persistent(const v8::Local<v8::Value> &value) {
     Nan::Persistent<v8::Value> *data = new Nan::Persistent<v8::Value>(value);
@@ -59,13 +58,15 @@ void R3::New(const Nan::FunctionCallbackInfo<v8::Value>& info) {
 
 void R3::Insert(const Nan::FunctionCallbackInfo<v8::Value>& info) {
   tree = ObjectWrap::Unwrap<R3>(info.Holder());
-  v8::String::Utf8Value str(info[0]);
 
-  const char* path = ToCString(str);
+  v8::String::Utf8Value str(info[0]);
+  path = *str;
+
+  int method = 0;
 
   r3::r3_tree_insert_routel(
     tree->tree_,
-    0,
+    method,
     path,
     strlen(path),
     ptr_from_value_persistent(info[1])
@@ -91,8 +92,7 @@ void R3::Match(const Nan::FunctionCallbackInfo<v8::Value>& info) {
   v8::Isolate* isolate = info.GetIsolate();
 
   v8::String::Utf8Value str(info[0]);
-
-  char* path = *str;
+  path = *str;
 
   entry->path = path;
   entry->path_len = str.length();
@@ -103,7 +103,7 @@ void R3::Match(const Nan::FunctionCallbackInfo<v8::Value>& info) {
     v8::Local<v8::Object> obj = v8::Object::New(isolate);
     v8::Local<v8::Array> tokens = v8::Array::New(isolate);
 
-    for (int i = 0; i < entry->vars->len ; i++) {
+    for (int i = 0; i < entry->vars->len; i++) {
       tokens->Set(i, v8::String::NewFromUtf8(isolate, entry->vars->tokens[i]));
     }
 
@@ -116,4 +116,10 @@ void R3::Match(const Nan::FunctionCallbackInfo<v8::Value>& info) {
   } else {
     info.GetReturnValue().Set(Nan::Null());
   }
+
+  //r3::str_array_free(entry->vars);
+  //entry->vars = r3::str_array_create(3);
+
+  //entry->vars = r3::str_array_create(3);
+  //entry->data = NULL;
 }

@@ -5,7 +5,6 @@
 
 namespace r3 {
   #include <r3/r3.h>
-  #include <r3/str_array.h>
 }
 
 class R3 : public Nan::ObjectWrap {
