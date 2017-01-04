@@ -97,11 +97,10 @@ void R3::Match(const Nan::FunctionCallbackInfo<v8::Value>& info) {
 
   //v8::String::Utf8Value str(info[0]);
   //std::string strpath = std::string(*str);
+  //path = *s;
 
-  path = s.c_str();
-
-  entry->path = path;
-  entry->path_len = strlen(path);
+  entry->path = &s[0];
+  entry->path_len = s.length();
 
   matched_route = r3::r3_tree_match_route(tree->tree_, entry);
 
