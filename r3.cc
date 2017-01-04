@@ -20,7 +20,7 @@ v8::Local<v8::Object> matchRet;
 v8::Isolate* isolate;
 char* path;
 v8::Local<v8::String::Utf8Value> str;
-r3::match_entry *entry = r3::match_entry_createl("/", 1);
+r3::match_entry *entry;
 
 void *ptr_from_value_persistent(const v8::Local<v8::Value> &value) {
     Nan::Persistent<v8::Value> *data = new Nan::Persistent<v8::Value>(value);
@@ -85,6 +85,9 @@ void R3::Compile(const Nan::FunctionCallbackInfo<v8::Value>& info) {
     Nan::ThrowError(errstr);
     delete errstr;
   }
+
+  entry = r3::match_entry_createl("/", 1);
+  r3::str_array_free(entry->vars);
 }
 
 void R3::Match(const Nan::FunctionCallbackInfo<v8::Value>& info) {
@@ -96,6 +99,7 @@ void R3::Match(const Nan::FunctionCallbackInfo<v8::Value>& info) {
 
   entry->path = path;
   entry->path_len = str.length();
+  entry->vars = r3::str_array_create(3);
 
   r3::route *matched_route = r3::r3_tree_match_route(tree->tree_, entry);
 
@@ -117,9 +121,6 @@ void R3::Match(const Nan::FunctionCallbackInfo<v8::Value>& info) {
     info.GetReturnValue().Set(Nan::Null());
   }
 
-  //r3::str_array_free(entry->vars);
-  //entry->vars = r3::str_array_create(3);
-
-  //entry->vars = r3::str_array_create(3);
-  //entry->data = NULL;
+  r3::str_array_free(entry->vars);
+  entry->data = NULL;
 }
