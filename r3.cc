@@ -86,6 +86,7 @@ void R3::Compile(const Nan::FunctionCallbackInfo<v8::Value>& info) {
   }
 }
 
+/*
 void R3::Match(const Nan::FunctionCallbackInfo<v8::Value>& info) {
   Nan::HandleScope scope;
 
@@ -93,14 +94,13 @@ void R3::Match(const Nan::FunctionCallbackInfo<v8::Value>& info) {
   isolate = info.GetIsolate();
 
   v8::String::Utf8Value cmd(info[0]);
-  std::string s = std::string(*cmd);
+  char* p = *cmd;
 
-  //v8::String::Utf8Value str(info[0]);
-  //std::string strpath = std::string(*str);
-  //path = *s;
+  //entry->path = p;
+  //entry->path_len = cmd.length();
 
-  entry->path = &s[0];
-  entry->path_len = s.length();
+  entry = r3::match_entry_create("/exobot/help");
+  //printf("%s %s %d\n", "pointer", entry->path, entry->path_len);
 
   matched_route = r3::r3_tree_match_route(tree->tree_, entry);
 
@@ -122,4 +122,37 @@ void R3::Match(const Nan::FunctionCallbackInfo<v8::Value>& info) {
   }
 
   info.GetReturnValue().Set(Nan::Null());
+}
+*/
+
+void R3::Match(const Nan::FunctionCallbackInfo<v8::Value>& info) {
+  R3* tree = ObjectWrap::Unwrap<R3>(info.Holder());
+  v8::Isolate* isolate = info.GetIsolate();
+
+  v8::String::Utf8Value str(info[0]);
+
+  char* path = *str;
+
+  entry->path = path;
+  entry->path_len = str.length();
+
+  r3::route *matched_route = r3::r3_tree_match_route(tree->tree_, entry);
+
+  if (matched_route) {
+    v8::Local<v8::Object> obj = v8::Object::New(isolate);
+    v8::Local<v8::Array> tokens = v8::Array::New(isolate);
+
+    for (int i = 0; i < entry->vars->len ; i++) {
+      tokens->Set(i, v8::String::NewFromUtf8(isolate, entry->vars->tokens[i]));
+    }
+
+    obj->Set(v8::String::NewFromUtf8(isolate, "params"), tokens);
+
+    v8::Local<v8::Value> fn = Nan::New(*reinterpret_cast<Nan::Persistent<v8::Value> *>(matched_route->data));
+    obj->Set(v8::String::NewFromUtf8(isolate, "fn"), fn);
+
+    info.GetReturnValue().Set(obj);
+  } else {
+    info.GetReturnValue().Set(Nan::Null());
+  }
 }
